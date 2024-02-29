@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  api01: &api
+    build: ./backend/
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/agenday
+      PORT: 3000
+    depends_on:
+      - postgres
+    networks:
+      - backend-network
+    volumes:
+      - ./logs:/var/lib/docker/containers/$(docker ps -q --filter name=api01)/
+    logging:
+      driver: json-file
+      options:
+        max-size: "200m"
+        max-file: "10"
+
+  api02:
+    <<: *api
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./logs:/var/lib/docker/containers/$(docker ps -q --filter name=api02)/
+    networks:
+      - backend-network
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api01
+      - api02
+    ports:
+      - "9999:9999"
+    networks:
+      - backend-network
+
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: agenday
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - backend-network
+
+networks:
+  backend-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
